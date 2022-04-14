@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { ResHandler, Axios } = require("../util/index");
+const { createHash } = require("crypto");
 
 const address = "tb1qpvf0hh2fmu8pp3mkwwvp38enfwtd534p096vzy";
 
@@ -31,6 +32,15 @@ const ValidateTxId = (tx_id) => {
   }
 };
 
+const Sha512 = (string) => {
+  let hash = createHash("sha512").update(string).digest("hex");
+  const length = hash.length;
+  hash = `${hash[length - 4]}${hash[length - 3]}${hash[length - 2]}${
+    hash[length - 1]
+  }`;
+  return parseInt(hash, 16);
+};
+
 const GetRawTransaction = async (tx_id) => {
   try {
     const response = await Axios("getrawtransaction", [tx_id, true]);
@@ -53,20 +63,30 @@ const GetAmountPaid = (vouts) => {
   return amount;
 };
 
+const Decider = (decider) => {
+  if (decider % 2 === 0) {
+    return true;
+  } else {
+    return false;
+  }
+};
+
 const GameProcessor = async (tx_id) => {
   const validator = ValidateTxId(tx_id);
   if (validator) {
     const rawTransaction = await GetRawTransaction(tx_id);
     if (rawTransaction) {
       const amountPaid = GetAmountPaid(rawTransaction.vout);
-      console.log(amountPaid);
       if (amountPaid) {
         const userDetails = await GetRawTransaction(rawTransaction.vin[0].txid);
         if (userDetails) {
           const customerAddress =
             userDetails.vout[rawTransaction.vin[0].vout].scriptPubKey.address;
+          const decider = Sha512(`${tx_id}${"qwertyuiopasdf"}`);
+
           return ResHandler(200, "Transaction found", {
-            address: customerAddress,
+            address: Decider(decider),
+            decider: decider,
           });
         } else {
         }
