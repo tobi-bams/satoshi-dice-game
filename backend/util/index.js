@@ -62,7 +62,12 @@ const Axios = async (method, parameter = []) => {
   }
 };
 
+const ResHandler = (status, message, data) => {
+  return { status, body: { message, data } };
+};
+
 module.exports = {
   Address,
   Axios,
+  ResHandler,
 };

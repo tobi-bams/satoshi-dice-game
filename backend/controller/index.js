@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { ResHandler } = require("../util/index");
 const GetAddress = async () => {
   const USER = process.env.RPC_USER;
   const PASS = process.env.RPC_PASSWORD;
@@ -21,6 +22,11 @@ const GetAddress = async () => {
 
 const GetRawTransaction = (transaction_id) => {};
 
+const GameProcessor = (transaction_id) => {
+  return ResHandler(200, "Transaction Successfull", { transaction_id });
+};
+
 module.exports = {
   GetAddress,
+  GameProcessor,
 };
