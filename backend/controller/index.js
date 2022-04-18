@@ -65,7 +65,6 @@ const GetPaymentDetail = (vouts) => {
 const FinalizePsbt = async (body) => {
   try {
     const response = await Axios("finalizepsbt", [body]);
-    console.log(response.data);
     return response.data.result.hex;
   } catch (error) {
     return ResHandler(500, "An internal Error Occured");
@@ -83,23 +82,19 @@ const CreateRawTransaction = async (body) => {
 
 const SignRawTransaction = async (body) => {
   try {
-    // const response = await Axios("signrawtransactionwithkey", body);
     const response = await Axios("walletprocesspsbt", body);
-    // console.log(response);
-    // return ResHandler(200, "We are good to go", { privatekey: response });
     return response.data.result.psbt;
   } catch (error) {
-    console.log(error.response);
-    return ResHandler(500, "An Error occcured, please try again later");
+    throw error;
   }
 };
 
 const SendRawTransaction = async (body) => {
   try {
     const response = await Axios("sendrawtransaction", [body]);
-    console.log(response.data);
+    // console.log(response.data);
   } catch (error) {
-    console.log(error.response);
+    throw error;
   }
 };
 
@@ -134,6 +129,32 @@ const GetNewAddress = async () => {
   }
 };
 
+const HandleTransaction = async (body, status) => {
+  try {
+    let rawTransaction = await CreateRawTransaction(body);
+    let signRawTransaction = await SignRawTransaction([rawTransaction]);
+    let finalizePsbt = await FinalizePsbt(signRawTransaction);
+    let sendRawTransaction = await SendRawTransaction(finalizePsbt);
+    ResHandler(
+      200,
+      status
+        ? "Congartulation You Won this game"
+        : "Ops, So sorry you lost this round",
+      { tx_id: sendRawTransaction }
+    );
+  } catch (error) {
+    let message = "An error occured, please try again later";
+    let status = 500;
+    if (
+      error?.response?.data?.error?.message === "bad-txns-inputs-missingorspent"
+    ) {
+      message = "Sorry you've played with this transaction id before";
+      status = 403;
+    }
+    return ResHandler(status, message);
+  }
+};
+
 const Decider = async (decider, address, tx_id, payment_detail) => {
   const changeAddress = await GetNewAddress();
   if (decider % 2 === 0) {
@@ -149,11 +170,7 @@ const Decider = async (decider, address, tx_id, payment_detail) => {
         },
       ],
     ];
-    let rawTransaction = await CreateRawTransaction(body);
-    let signRawTransaction = await SignRawTransaction([rawTransaction]);
-    let finalizePsbt = await FinalizePsbt(signRawTransaction);
-    let sendRawTransaction = await SendRawTransaction(finalizePsbt);
-    return ResHandler(200, "We are good");
+    return HandleTransaction(body);
   }
 };
 
