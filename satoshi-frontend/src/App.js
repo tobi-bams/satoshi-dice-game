@@ -2,19 +2,25 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import axios from "axios";
 import Swal from "sweetalert2";
-
-const Output = {
-  data: {
-    tx_id: "35d2e90b9184e6d3d1c015f14df81d647b736d6e840a47a317b2697aec0cc384",
-  },
-  message: "Ops, So sorry you lost this round",
-};
+import Copy from "./asset/copy.svg";
+import { CopyToClipboard } from "react-copy-to-clipboard";
+import Toastr from "toastr";
 
 function App() {
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
   const [txInput, setTxInput] = useState("");
   const [output, setOutput] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (copied) {
+      Toastr.success("Address copied successfully");
+      setTimeout(() => {
+        setCopied(false);
+      }, 3000);
+    }
+  }, [copied]);
   useEffect(() => {
     getAddress();
   }, []);
@@ -68,10 +74,19 @@ function App() {
         <h2 className="text-4xl text-center font-bold mb-8">
           Satoshi Dice Game
         </h2>
-        <p className="text-3xl">
-          Pay to this Address to play:{" "}
-          <span className="font-semibold">{address}</span>
-        </p>
+        <div className="flex flex-col">
+          <p className="text-3xl">Pay to this Address to play: </p>
+          <div className="flex items-centers">
+            <p className="font-semibold text-lg">{address}</p>
+            <CopyToClipboard text={`${address}`} onCopy={() => setCopied(true)}>
+              <span className="cursor-pointer">
+                <div className="h-7 w-7 cursor-pointer ml-8">
+                  <img src={Copy} alt="Copy Content" />
+                </div>
+              </span>
+            </CopyToClipboard>
+          </div>
+        </div>
       </div>
       <form
         className="w-full mt-16 flex justify-center items-center flex-col"
