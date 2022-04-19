@@ -1,6 +1,7 @@
 const axios = require("axios");
 const { ResHandler, Axios } = require("../util/index");
 const { createHash } = require("crypto");
+const { Console } = require("console");
 
 const address = "tb1qpvf0hh2fmu8pp3mkwwvp38enfwtd534p096vzy";
 const fee = 1000;
@@ -33,6 +34,14 @@ const ValidateTxId = (tx_id) => {
   }
 };
 
+const ConvertToSatoshi = (value) => {
+  return value * 100000000;
+};
+
+const ConvertToBtc = (value) => {
+  return value / 100000000;
+};
+
 const Sha512 = (string) => {
   let hash = createHash("sha512").update(string).digest("hex");
   const length = hash.length;
@@ -49,6 +58,35 @@ const GetRawTransaction = async (tx_id) => {
   } catch (error) {
     return false;
   }
+};
+
+const ListUnspentTransaction = async () => {
+  try {
+    const response = await Axios("listunspent");
+    return response.data.result;
+  } catch (error) {
+    console.log(error.response);
+    throw error;
+  }
+};
+const SelectUtxos = (utxos, tx_id, amountToBePaid, amountPaid) => {
+  const selectedUtxos = [];
+  let amount = ConvertToSatoshi(amountPaid);
+  console.log(ConvertToSatoshi(amountToBePaid));
+  for (let i = 0; i < utxos.length; i++) {
+    let utxo = utxos[i];
+    if (utxo.txid !== tx_id) {
+      let input = { txid: utxo.txid, vout: utxo.vout };
+      amount = amount + ConvertToSatoshi(utxo.amount);
+      selectedUtxos.push(input);
+      console.log(amount);
+      if (amount > ConvertToSatoshi(amountToBePaid)) {
+        break;
+      }
+    }
+  }
+
+  return selectedUtxos;
 };
 
 const GetPaymentDetail = (vouts) => {
@@ -76,7 +114,8 @@ const CreateRawTransaction = async (body) => {
     const transaction = await Axios("walletcreatefundedpsbt", body);
     return transaction.data.result.psbt;
   } catch (error) {
-    return ResHandler(500, "An error occured Please try again laters");
+    throw error;
+    // return ResHandler(500, "An error occured Please try again laters");
   }
 };
 
@@ -92,28 +131,24 @@ const SignRawTransaction = async (body) => {
 const SendRawTransaction = async (body) => {
   try {
     const response = await Axios("sendrawtransaction", [body]);
+    return response.data.result;
     // console.log(response.data);
   } catch (error) {
     throw error;
   }
 };
 
-const ConvertToSatoshi = (value) => {
-  return value * 100000000;
-};
-
-const ConvertToBtc = (value) => {
-  return value / 100000000;
-};
-
 const LoserAmountHandler = (value) => {
-  let incomingValue = ConvertToSatoshi(value);
   let amount = ConvertToSatoshi(value) * 0.1;
-  let newFee = amount * 0.5;
-  let change = incomingValue - (amount + newFee);
   amount = ConvertToBtc(amount);
-  change = ConvertToBtc(change);
-  return { amount, change };
+  return { amount };
+};
+
+const WinnerAmountHandler = (incomingvalue) => {
+  let value = ConvertToSatoshi(incomingvalue);
+  let amount = value + value * 0.5;
+  amount = ConvertToBtc(amount);
+  return { amount };
 };
 
 const WinnerHandler = () => {};
@@ -135,14 +170,15 @@ const HandleTransaction = async (body, status) => {
     let signRawTransaction = await SignRawTransaction([rawTransaction]);
     let finalizePsbt = await FinalizePsbt(signRawTransaction);
     let sendRawTransaction = await SendRawTransaction(finalizePsbt);
-    ResHandler(
+    return ResHandler(
       200,
       status
-        ? "Congartulation You Won this game"
+        ? "Congratulations you Won this game"
         : "Ops, So sorry you lost this round",
       { tx_id: sendRawTransaction }
     );
   } catch (error) {
+    console.log(error.response);
     let message = "An error occured, please try again later";
     let status = 500;
     if (
@@ -156,21 +192,29 @@ const HandleTransaction = async (body, status) => {
 };
 
 const Decider = async (decider, address, tx_id, payment_detail) => {
-  const changeAddress = await GetNewAddress();
   if (decider % 2 === 0) {
-    return ResHandler(200, "We are good");
+    const winner = WinnerAmountHandler(payment_detail.amount);
+    const utxos = await ListUnspentTransaction();
+    const selectedUtxo = await SelectUtxos(
+      utxos,
+      tx_id,
+      winner.amount,
+      payment_detail.amount
+    );
+    const body = [
+      [{ txid: tx_id, vout: payment_detail.index }, ...selectedUtxo],
+      [{ [`${address}`]: winner.amount }],
+    ];
+    return ResHandler(200, "Win", body);
+    // return HandleTransaction(body, true);
   } else {
     const loser = LoserAmountHandler(payment_detail.amount);
     const body = [
       [{ txid: tx_id, vout: payment_detail.index }],
-      [
-        { [`${address}`]: loser.amount },
-        {
-          [`${changeAddress}`]: loser.change,
-        },
-      ],
+      [{ [`${address}`]: loser.amount }],
     ];
-    return HandleTransaction(body);
+    // return ResHandler(400, "Loose");
+    return HandleTransaction(body, false);
   }
 };
 
@@ -185,7 +229,7 @@ const GameProcessor = async (tx_id) => {
         if (userDetails) {
           const customerAddress =
             userDetails.vout[rawTransaction.vin[0].vout].scriptPubKey.address;
-          const decider = Sha512(`${tx_id}${"qwertyuiopasdfg4"}`);
+          const decider = Sha512(`${tx_id}${"qwertyuiopasdfg454"}`);
           return Decider(decider, customerAddress, tx_id, paymentDetail);
         }
       } else {
@@ -197,7 +241,7 @@ const GameProcessor = async (tx_id) => {
     } else {
       return ResHandler(
         404,
-        "Transaction was mot found in the Mempool nor the blockchain"
+        "Transaction was not found in the Mempool nor the blockchain"
       );
     }
   } else {
