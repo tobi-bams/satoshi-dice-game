@@ -1,7 +1,6 @@
 const axios = require("axios");
 const { ResHandler, Axios } = require("../util/index");
 const { createHash } = require("crypto");
-const { Console } = require("console");
 
 const address = "tb1qpvf0hh2fmu8pp3mkwwvp38enfwtd534p096vzy";
 const fee = 1000;
@@ -72,7 +71,6 @@ const ListUnspentTransaction = async () => {
 const SelectUtxos = (utxos, tx_id, amountToBePaid, amountPaid) => {
   const selectedUtxos = [];
   let amount = ConvertToSatoshi(amountPaid);
-  console.log(ConvertToSatoshi(amountToBePaid));
   for (let i = 0; i < utxos.length; i++) {
     let utxo = utxos[i];
     if (utxo.txid !== tx_id) {
@@ -205,8 +203,8 @@ const Decider = async (decider, address, tx_id, payment_detail) => {
       [{ txid: tx_id, vout: payment_detail.index }, ...selectedUtxo],
       [{ [`${address}`]: winner.amount }],
     ];
-    return ResHandler(200, "Win", body);
-    // return HandleTransaction(body, true);
+    // return ResHandler(200, "Win", body);
+    return HandleTransaction(body, true);
   } else {
     const loser = LoserAmountHandler(payment_detail.amount);
     const body = [
