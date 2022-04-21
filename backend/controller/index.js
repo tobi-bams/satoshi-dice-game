@@ -137,15 +137,18 @@ const SendRawTransaction = async (body) => {
 };
 
 const LoserAmountHandler = (value) => {
-  let amount = ConvertToSatoshi(value) * 0.1;
-  amount = ConvertToBtc(amount);
+  console.log(value);
+  let amount = value * 0.1;
+  //   amount = ConvertToBtc(amount);
+  amount = parseFloat(amount.toFixed(8));
   return { amount };
 };
 
-const WinnerAmountHandler = (incomingvalue) => {
-  let value = ConvertToSatoshi(incomingvalue);
+const WinnerAmountHandler = (value) => {
+  //   let value = ConvertToSatoshi(incomingvalue);
   let amount = value + value * 0.5;
-  amount = ConvertToBtc(amount);
+  //   amount = ConvertToBtc(amount);
+  amount = parseFloat(amount.toFixed(8));
   return { amount };
 };
 
